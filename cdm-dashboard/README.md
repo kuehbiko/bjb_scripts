@@ -15,7 +15,5 @@ The scripts read and process the data and determine:
 - The breakdown of rejected tasks and their respective rejection reasons
 
 The end goal of this project is to monitor the productivity of the CDS department and even expand into monitoring trends for individual workers. We are considering generating a BI dashboard from this data to show trends graphically.
-***
 
-Sample data and output have been included in the CDM Reports and Output folders.
 
