@@ -1,6 +1,6 @@
-Simple python scripts written in my own time for easier processing of work reports and files. These scripts are not required of me at my job, but rather something I have developed to make my life easier.
+These are a collection of simple python scripts written for my personal convenience at work. The purpose of these scripts are to make the processing of work reports and files easier. These scripts are not required of me nor part of my job scope, however, I have developed them as a series of personal projects to practice using python pandas and make my daily work easier.
 
-Directory:
+### Directory:
 |Folder|Project Date|Description|
 |---|---|---|
 |[ad_hoc](https://github.com/kuehbiko/bjb_work/tree/main/ad_hoc)|NA|Scripts for basic repetitive tasks that do not fall under any category or project. This includes scripts to automate sending Outlook emails, a script to search a local excel database and copy the output directly to the clipboard, a script to check through BAU work folders and flag unfinished tasks at the end of day.|
