@@ -1,0 +1,242 @@
+{
+ "cells": [
+  {
+   "cell_type": "code",
+   "execution_count": 2,
+   "id": "8f447f94",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# import libraries\n",
+    "import pandas as pd\n",
+    "import numpy as np"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 3,
+   "id": "9b526169",
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "C:\\ProgramData\\Anaconda3\\lib\\site-packages\\openpyxl\\styles\\stylesheet.py:221: UserWarning: Workbook contains no default style, apply openpyxl's default\n",
+      "  warn(\"Workbook contains no default style, apply openpyxl's default\")\n"
+     ]
+    }
+   ],
+   "source": [
+    "# read file\n",
+    "df = pd.read_excel('../data_and_output/110255_R2_Report.xlsx')"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "abc2dabb",
+   "metadata": {},
+   "source": [
+    "***"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 5,
+   "id": "549a87c7",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# main portfolios excluding mains with NO associates\n",
+    "main_df = df[(df['Category'] == 'Main') &\n",
+    "             (df['Portfolio Number'].isin(df['Main Portfolio'].tolist()))]\n",
+    "\n",
+    "# associate portfolios\n",
+    "assc_df = df[df['Category'] == 'Associated']\n",
+    "\n",
+    "# legacy -02 portfolios (has value in main pf but main pf is closed and not in pf list)\n",
+    "legacy_df = df[(~df['Main Portfolio'].isna()) & \n",
+    "               (~df['Main Portfolio'].isin(df['Portfolio Number'].tolist()))]"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 6,
+   "id": "88d02623",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# list of all legacy -02 main portfolios\n",
+    "legacy_list = legacy_df['Portfolio Number'].drop_duplicates().tolist()\n",
+    "\n",
+    "legacy_02_list = []\n",
+    "for pf in legacy_list: # loop to pick out the 'main' -02 portfolios only\n",
+    "    if pf[-2:] == '02': legacy_02_list.append(pf) # only portfolios ending with -02\n",
+    "    else: continue\n",
+    "\n",
+    "# remove all legacy-02 portfolios from assc_df\n",
+    "assc_df = assc_df.drop(assc_df[assc_df['Portfolio Number'].isin(legacy_02_list)].index)\n",
+    "\n",
+    "# add all legacy-02 portfolios to main_df\n",
+    "main_df = pd.concat([main_df, legacy_df[legacy_df['Portfolio Number'].isin(legacy_02_list)]], ignore_index=True)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 7,
+   "id": "27613075",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# in assc_df, replace the main portfolio for all associate portfolios of legacy-02 portfolios\n",
+    "for pf in legacy_df['Main Portfolio'].tolist(): #for each legacy portfolio's -01 portfolio\n",
+    "    \n",
+    "    new_main_list = legacy_df.loc[legacy_df['Main Portfolio']==pf]['Portfolio Number'].tolist()\n",
+    "    \n",
+    "    if new_main_list: # if list not empty = if TRUE = pf is a legacy -02 portfolio\n",
+    "        new_main_pf = new_main_list[0]\n",
+    "        assc_df.loc[assc_df['Main Portfolio'] == pf, 'Main Portfolio'] = new_main_pf # update main portfolio of legacy assc\n",
+    "        main_df.loc[main_df['Main Portfolio'] == pf, 'Main Portfolio'] = new_main_pf # update main portfolio of legacy 02\n",
+    "        main_df.loc[main_df['Main Portfolio'] == pf, 'Category'] = 'Main' # update category of legacy 02\n",
+    "    \n",
+    "    else: continue # if pf is NOT a legacy -02 portfolio"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "77007e2c",
+   "metadata": {},
+   "source": [
+    "***"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 9,
+   "id": "1ec0e6c3",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# create identifying keys for each party/partyrole\n",
+    "main_df['Key'] = main_df['Party ID'] + main_df['Relationship (Party Role)']\n",
+    "assc_df['Key'] = assc_df['Party ID'] + assc_df['Relationship (Party Role)']"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 10,
+   "id": "11b3281e",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# list of main portfolios\n",
+    "main_list = main_df['Portfolio Number'].drop_duplicates().tolist()\n",
+    "\n",
+    "total_main_list = []\n",
+    "total_assc_list = []\n",
+    "\n",
+    "for main in main_list: # iterate through main portfolios\n",
+    "    \n",
+    "    # list of all portfolios associated with 'main'\n",
+    "    assc_list = assc_df[assc_df['Main Portfolio'] == main]['Portfolio Number'].drop_duplicates().tolist()\n",
+    "    \n",
+    "    # create set of all parties and respective roles in 'main'\n",
+    "    main_party = main_df[main_df['Portfolio Number'] == main]['Key'].tolist()\n",
+    "    main_party_set = set(main_party)\n",
+    "    \n",
+    "    for assc in assc_list: # iterate through main's associated portfolios\n",
+    "        \n",
+    "        # create set of all parties and respective roles in 'main'\n",
+    "        assc_party = assc_df[assc_df['Portfolio Number'] == assc]['Key'].tolist()\n",
+    "        assc_party_set = set(assc_party)\n",
+    "        \n",
+    "        main_assc = main_party_set.difference(assc_party_set)\n",
+    "        assc_main = assc_party_set.difference(main_party_set)\n",
+    "        \n",
+    "        if  main_assc: # if main_assc is NOT empty = if TRUE\n",
+    "        \n",
+    "            temp_main_dict = {}\n",
+    "            temp_main_dict['Main Portfolio'] = main\n",
+    "            temp_main_dict['Party Present in'] = main\n",
+    "            #temp_main_dict['Portfolio Opening Date'] = df[df['portfolio number']==main]['portfolio opening date']\n",
+    "            temp_main_dict['Party Not Found in'] = assc\n",
+    "            #temp_main_dict['Portfolio Opening Date.2'] = df[df['portfolio number']==assc]['portfolio opening date']\n",
+    "            temp_main_dict['Party'] = main_assc\n",
+    "            \n",
+    "            total_main_list.append(temp_main_dict)\n",
+    "        \n",
+    "        if assc_main:\n",
+    "        \n",
+    "            temp_assc_dict = {}\n",
+    "            temp_assc_dict['Main Portfolio'] = main\n",
+    "            temp_assc_dict['Party Present in'] = assc\n",
+    "            #temp_assc_dict['Portfolio Opening Date'] = df[df['portfolio number']==assc]['portfolio opening date']\n",
+    "            temp_assc_dict['Party Not Found in'] = main\n",
+    "            #temp_assc_dict['Portfolio Opening Date.2'] = df[df['portfolio number']==main]['portfolio opening date']\n",
+    "            temp_assc_dict['Party'] = assc_main\n",
+    "        \n",
+    "            total_assc_list.append(temp_assc_dict)\n",
+    "        \n",
+    "        else: continue"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 11,
+   "id": "ca5145e5",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "main_to_assc_df = pd.DataFrame(total_main_list)\n",
+    "assc_to_main_df = pd.DataFrame(total_assc_list)\n",
+    "final_df = pd.concat(['main_to_assc_df', assc_to_main_df])"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "1cf700b1",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# wip"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "3b4d852a",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# split party column into something more readable (df.melt)\n",
+    "\n",
+    "# add in standard action team,\n",
+    "# sort by main portfolio number\n",
+    "# finally print to \n",
+    "#final_df = pd.concat([df1, df2])"
+   ]
+  }
+ ],
+ "metadata": {
+  "kernelspec": {
+   "display_name": "Python 3",
+   "language": "python",
+   "name": "python3"
+  },
+  "language_info": {
+   "codemirror_mode": {
+    "name": "ipython",
+    "version": 3
+   },
+   "file_extension": ".py",
+   "mimetype": "text/x-python",
+   "name": "python",
+   "nbconvert_exporter": "python",
+   "pygments_lexer": "ipython3",
+   "version": "3.8.8"
+  }
+ },
+ "nbformat": 4,
+ "nbformat_minor": 5
+}
