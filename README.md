@@ -1,4 +1,4 @@
-These are a collection of simple python scripts written for my personal convenience at work. The purpose of these scripts are to make the processing of work reports and files easier. These scripts are not required of me nor part of my job scope, however, I have developed them as a series of personal projects to practice using python pandas and make my daily work easier.
+These are a collection of simple python scripts written for my personal convenience at work. The purpose of these scripts are to make the processing of work reports and files easier. These scripts are not required of me nor part of my job scope, however, I work with tabular data daily have developed these scripts as a series of personal projects to practice using python pandas and make my daily work easier.
 
 ### Directory:
 |Folder|Project Date|Description|
