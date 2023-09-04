@@ -1,0 +1,258 @@
+{
+ "cells": [
+  {
+   "cell_type": "code",
+   "execution_count": 1,
+   "id": "ff7cba95",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# import libraries\n",
+    "import numpy as np\n",
+    "import pandas as pd\n",
+    "from pandas import ExcelWriter\n",
+    "import time\n",
+    "from datetime import datetime\n",
+    "import datetime as dt\n",
+    "import warnings\n",
+    "warnings.simplefilter(\"ignore\")"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 2,
+   "id": "a80f65a5",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# output file name and location\n",
+    "current_date = time.strftime(\"%Y%m%d\")\n",
+    "output_file = 'natural_persons_main' + current_date + '.xlsx'"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 3,
+   "id": "3aa29846",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# import data\n",
+    "file_path = 'report_2.xlsx'\n",
+    "df = pd.read_excel(file_path)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "7d1e1680",
+   "metadata": {},
+   "source": [
+    "***"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "bb21c9e8",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# filter for individuals\n",
+    "df_natural = df[df['Party Type']=='Natural Person']"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 4,
+   "id": "73961283",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "#Preprocessing party name\n",
+    "df_natural.loc[:,'Party Name_pre']=df_natural['Party Name'].copy()\n",
+    "df_natural['Party Name_pre'] = df_natural['Party Name_pre'].str \\\n",
+    "                                                           .lower() \\\n",
+    "                                                           .replace(r'[^\\w\\s]',\"\")"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "f610e2d0",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "#Prepocessing 'Identification Document Number' remove space & casing\n",
+    "df_natural.loc[:,'Identification Document Number_pre']=df_natural['Identification Document Number'].copy()\n",
+    "df_natural['Identification Document Number_pre'] = df_natural['Identification Document Number_pre'].str \\\n",
+    "                                                                                                   .lower() \\\n",
+    "                                                                                                   .replace(r'[^\\w\\s]',\"\")"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "8930d28b",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# create beneficiary only list\n",
+    "bene_only = df_natural.groupby('Party ID')['Relationship (Party Role)'] \\\n",
+    "                      .agg(set) \\\n",
+    "                      .reset_index(name = 'role_set')\n",
+    "\n",
+    "bene_only = bene_only[bene_only['role_set'] == {'Beneficiary'}]\n",
+    "bene_only_list = bene_only['Party ID'].to_list()\n",
+    "\n",
+    "df_natural['bene_only'] = df_natural['Party ID'].isin(bene_only_list)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "275ae4b0",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "#dates\n",
+    "df_natural['Date of Birth']  = pd.to_datetime(df_natural['Date of Birth'], format='%Y-%m-%d', errors='coerce').dt.date"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "6e6b9b9d",
+   "metadata": {},
+   "source": [
+    "***"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "f8465420",
+   "metadata": {},
+   "source": [
+    "### HK ID without HK Passport or DON"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "7cb48818",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# to do:\n",
+    "# add new column: Party only has HK nationality OR Party has dual nationality"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 5,
+   "id": "15f16e19",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "tab25 = df_natural.copy()\n",
+    "\n",
+    "# create a key\n",
+    "tab25['key'] = tab25['Party Name_pre'].astype(str) + tab25['Date of Birth'].astype(str)\n",
+    "\n",
+    "# only HK Nationality\n",
+    "tab25 = tab25[tab25[\"Nationality\"] == \"Hong Kong\"]\n",
+    "\n",
+    "# only HK documents\n",
+    "tab25 = tab25[tab25[\"Identification Document Issue Country\"] == \"Hong Kong\"]\n",
+    "\n",
+    "# set of all ID documents a party has\n",
+    "tab25_id = tab25.groupby('key')['Identification Document Type'] \\\n",
+    "                .agg(set) \\\n",
+    "                .reset_index(name='id_set')\n",
+    "\n",
+    "id_set = tab25_id['id_set'].tolist()\n",
+    "\n",
+    "def check_id(id_set): # function to check that id set does not contain HK passport\n",
+    "    hk_set = {'Passport, Declaration of Nationality'}\n",
+    "    result = id_set.intersection(hk_set)\n",
+    "    return len(result) == 0 #if TRUE: empty intersection. means HK Passport not present\n",
+    "\n",
+    "tab25_id['passport_missing'] = tab25_id['id_set'].apply(lambda x: check_id(x))\n",
+    "tab25_id = tab25_id[tab25_id['passport_missing'] == True]\n",
+    "\n",
+    "# compare keep list to original table\n",
+    "tab25_id_list = tab25_id['key'].tolist()\n",
+    "tab25['exist'] = tab25['key'].isin(tab25_id_list)\n",
+    "tab25 = tab25[tab25['exist'] == True]\n",
+    "\n",
+    "# remove duplicates and sort\n",
+    "tab25 = tab25.drop_duplicates(subset = ['Party ID', 'key']) \\\n",
+    "             .sort_values(by = [\"key\",'Party ID'])\n",
+    "\n",
+    "# select columns\n",
+    "tab25_columns = tab25[['Party ID','Party Name',\n",
+    "                       'RM UID.1','RM Name.1',\n",
+    "                       'Date of Birth','Nationality',\n",
+    "                       'Identification Document Type',\n",
+    "                       'Identification Document Issue Country',\n",
+    "                       'Identification Document Number',\n",
+    "                       'Identification Date of Issue',\n",
+    "                       'Identification Document Expiry Date',\n",
+    "                       'Identification Document - Please Specify',\n",
+    "                       'Override Expiry',\n",
+    "                       'Override Expiry Reason',\n",
+    "                       'Override Expiry Justification',\n",
+    "                       'Deceased Flag',\n",
+    "                       'bene_only']]"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "b6a658d6",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "party_list = tab25_columns['Party ID'].tolist()\n",
+    "result_list = []\n",
+    "\n",
+    "for party in party_list:\n",
+    "    nationality_set = set(df_natural[df_natural['Party ID']==party]['Nationality'].tolist())\n",
+    "    if len(nationality_set) == 1: result_list.append('TRUE')\n",
+    "    else: result_list.append('FALSE')\n",
+    "    \n",
+    "\n",
+    "tab25_columns['HK_nationality_only'] = result_list"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 6,
+   "id": "ec901cae",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "tab25_columns.to_csv('HK ID no Passport or DON.xlsx', index=False)"
+   ]
+  }
+ ],
+ "metadata": {
+  "kernelspec": {
+   "display_name": "Python 3",
+   "language": "python",
+   "name": "python3"
+  },
+  "language_info": {
+   "codemirror_mode": {
+    "name": "ipython",
+    "version": 3
+   },
+   "file_extension": ".py",
+   "mimetype": "text/x-python",
+   "name": "python",
+   "nbconvert_exporter": "python",
+   "pygments_lexer": "ipython3",
+   "version": "3.8.8"
+  }
+ },
+ "nbformat": 4,
+ "nbformat_minor": 5
+}
